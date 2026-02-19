@@ -80,14 +80,10 @@ pub struct WsReceiver<R: WsCodec> {
 
 impl<R: WsCodec> WsReceiver<R> {
     pub async fn recv(&mut self) -> Option<Result<R, RecvError>> {
-        loop {
-            match self.stream.next().await {
-                None => return None,
-                Some(Err(_)) => return Some(Err(RecvError::Closed)),
-                Some(Ok(ws_msg)) => {
-                    return Some(R::decode(ws_msg).map_err(RecvError::Decode));
-                }
-            }
+        match self.stream.next().await {
+            None => None,
+            Some(Err(_)) => Some(Err(RecvError::Closed)),
+            Some(Ok(ws_msg)) => Some(R::decode(ws_msg).map_err(RecvError::Decode)),
         }
     }
 }
@@ -109,14 +105,10 @@ impl<S: WsCodec, R: WsCodec> WsConnection<S, R> {
     }
 
     pub async fn recv(&mut self) -> Option<Result<R, RecvError>> {
-        loop {
-            match self.stream.next().await {
-                None => return None,
-                Some(Err(_)) => return Some(Err(RecvError::Closed)),
-                Some(Ok(ws_msg)) => {
-                    return Some(R::decode(ws_msg).map_err(RecvError::Decode));
-                }
-            }
+        match self.stream.next().await {
+            None => None,
+            Some(Err(_)) => Some(Err(RecvError::Closed)),
+            Some(Ok(ws_msg)) => Some(R::decode(ws_msg).map_err(RecvError::Decode)),
         }
     }
 
@@ -136,23 +128,16 @@ impl<S: WsCodec, R: WsCodec> WsConnection<S, R> {
 
 // -- Erased trait objects for transport independence --
 
+pub(crate) type BoxFuture<'a, T> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
+
 /// Type-erased sink that can send `WsMessage`s.
 pub(crate) trait ErasedSink: Send {
-    fn send(
-        &mut self,
-        msg: WsMessage,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ()>> + Send + '_>>;
-
-    fn close(
-        &mut self,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ()>> + Send + '_>>;
+    fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), ()>>;
+    fn close(&mut self) -> BoxFuture<'_, Result<(), ()>>;
 }
 
 /// Type-erased stream that yields `WsMessage`s.
 pub(crate) trait ErasedStream: Send {
-    fn next(
-        &mut self,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Option<Result<WsMessage, ()>>> + Send + '_>,
-    >;
+    fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, ()>>>;
 }

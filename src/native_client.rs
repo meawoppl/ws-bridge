@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::marker::PhantomData;
 
 use futures_util::stream::StreamExt;
@@ -6,7 +5,7 @@ use futures_util::SinkExt;
 use tokio_tungstenite::tungstenite;
 
 use crate::codec::WsMessage;
-use crate::connection::{ErasedSink, ErasedStream, WsConnection};
+use crate::connection::{BoxFuture, ErasedSink, ErasedStream, WsConnection};
 use crate::WsEndpoint;
 
 /// A native client-side typed WebSocket connection.
@@ -63,17 +62,13 @@ pub async fn connect_to_url<E: WsEndpoint>(url: &str) -> Result<Connection<E>, C
 
 // -- tokio-tungstenite transport adapters --
 
-type WsStream = tokio_tungstenite::WebSocketStream<
-    tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
->;
+type WsStream =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 struct TungsteniteSink(futures_util::stream::SplitSink<WsStream, tungstenite::Message>);
 
 impl ErasedSink for TungsteniteSink {
-    fn send(
-        &mut self,
-        msg: WsMessage,
-    ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), ()>> + Send + '_>> {
+    fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), ()>> {
         Box::pin(async move {
             let tung_msg = match msg {
                 WsMessage::Text(t) => tungstenite::Message::Text(t),
@@ -83,9 +78,7 @@ impl ErasedSink for TungsteniteSink {
         })
     }
 
-    fn close(
-        &mut self,
-    ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), ()>> + Send + '_>> {
+    fn close(&mut self) -> BoxFuture<'_, Result<(), ()>> {
         Box::pin(async move { self.0.close().await.map_err(|_| ()) })
     }
 }
@@ -93,11 +86,7 @@ impl ErasedSink for TungsteniteSink {
 struct TungsteniteStream(futures_util::stream::SplitStream<WsStream>);
 
 impl ErasedStream for TungsteniteStream {
-    fn next(
-        &mut self,
-    ) -> std::pin::Pin<
-        Box<dyn Future<Output = Option<Result<WsMessage, ()>>> + Send + '_>,
-    > {
+    fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, ()>>> {
         Box::pin(async move {
             loop {
                 match self.0.next().await {

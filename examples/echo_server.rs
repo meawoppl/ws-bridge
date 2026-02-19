@@ -28,11 +28,7 @@ async fn main() {
                 match result {
                     Ok(ClientMsg::Say { text }) => {
                         println!("Received: {text}");
-                        conn.send(ServerMsg::Echo {
-                            payload: text,
-                        })
-                        .await
-                        .unwrap();
+                        conn.send(ServerMsg::Echo { payload: text }).await.unwrap();
                     }
                     Ok(ClientMsg::Quit) => {
                         println!("Client said goodbye");
@@ -56,6 +52,9 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
         .unwrap();
-    println!("Echo server listening on ws://127.0.0.1:3000{}", EchoEndpoint::PATH);
+    println!(
+        "Echo server listening on ws://127.0.0.1:3000{}",
+        EchoEndpoint::PATH
+    );
     axum::serve(listener, app).await.unwrap();
 }

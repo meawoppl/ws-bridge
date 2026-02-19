@@ -41,9 +41,7 @@ async fn main() {
                     while let Some(Ok(msg)) = conn.recv().await {
                         match msg {
                             ClientMsg::Say { text } => {
-                                conn.send(ServerMsg::Echo { payload: text })
-                                    .await
-                                    .unwrap();
+                                conn.send(ServerMsg::Echo { payload: text }).await.unwrap();
                             }
                             ClientMsg::Quit => break,
                         }

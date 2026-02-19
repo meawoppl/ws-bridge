@@ -160,7 +160,9 @@ where
         self.conn = None;
         loop {
             if self.attempt > 0 {
-                let delay = self.config.delay_for_attempt(self.attempt.saturating_sub(1));
+                let delay = self
+                    .config
+                    .delay_for_attempt(self.attempt.saturating_sub(1));
                 tokio::time::sleep(delay).await;
             }
             self.attempt = self.attempt.saturating_add(1);
@@ -187,6 +189,7 @@ where
 /// );
 /// ```
 #[cfg(feature = "native-client")]
+#[allow(clippy::type_complexity)]
 pub fn connect_native<E>(
     base_url: String,
     config: BackoffConfig,
@@ -203,10 +206,11 @@ pub fn connect_native<E>(
 where
     E: crate::WsEndpoint,
 {
-    ReconnectingWs::new(config, move || -> std::pin::Pin<
-        Box<dyn Future<Output = Option<WsConnection<E::ClientMsg, E::ServerMsg>>> + Send>,
-    > {
+    ReconnectingWs::new(config, move || {
         let url = base_url.clone();
         Box::pin(async move { crate::native_client::connect::<E>(&url).await.ok() })
+            as std::pin::Pin<
+                Box<dyn Future<Output = Option<WsConnection<E::ClientMsg, E::ServerMsg>>> + Send>,
+            >
     })
 }

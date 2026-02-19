@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run tests
+        run: cargo test --features "server,native-client,reconnect"
+
+  check-features:
+    name: Check feature combinations
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features:
+          - "server"
+          - "native-client"
+          - "reconnect"
+          - "server,native-client"
+          - "server,native-client,reconnect"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check (${{ matrix.features }})
+        run: cargo check --features "${{ matrix.features }}"
+
+  check-wasm:
+    name: Check WASM (yew-client)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Check yew-client
+        run: cargo check --features yew-client --target wasm32-unknown-unknown
+      - name: Check all features (WASM)
+        run: cargo check --all-features --target wasm32-unknown-unknown
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy (server + native-client + reconnect)
+        run: cargo clippy --features "server,native-client,reconnect" -- -D warnings
+
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt -- --check

@@ -42,9 +42,8 @@ pub fn connect<E: WsEndpoint>() -> Result<Connection<E>, ConnectError> {
 ///
 /// Use this when you need a custom URL (e.g., a different host).
 pub fn connect_to<E: WsEndpoint>(url: &str) -> Result<Connection<E>, ConnectError> {
-    let ws = WebSocket::open(url).map_err(|e| {
-        ConnectError(gloo_net::websocket::WebSocketError::MessageSendError(e))
-    })?;
+    let ws = WebSocket::open(url)
+        .map_err(|e| ConnectError(gloo_net::websocket::WebSocketError::MessageSendError(e)))?;
     let (sink, stream) = ws.split();
     Ok(Connection {
         sink,
@@ -72,7 +71,10 @@ impl<E: WsEndpoint> Connection<E> {
             WsMessage::Text(t) => Message::Text(t),
             WsMessage::Binary(b) => Message::Bytes(b),
         };
-        self.sink.send(gloo_msg).await.map_err(|_| SendError::Closed)
+        self.sink
+            .send(gloo_msg)
+            .await
+            .map_err(|_| SendError::Closed)
     }
 
     pub async fn recv(&mut self) -> Option<Result<E::ServerMsg, RecvError>> {
@@ -85,9 +87,7 @@ impl<E: WsEndpoint> Connection<E> {
                         Message::Text(t) => WsMessage::Text(t),
                         Message::Bytes(b) => WsMessage::Binary(b),
                     };
-                    return Some(
-                        E::ServerMsg::decode(ws_msg).map_err(RecvError::Decode),
-                    );
+                    return Some(E::ServerMsg::decode(ws_msg).map_err(RecvError::Decode));
                 }
             }
         }
@@ -121,7 +121,10 @@ impl<E: WsEndpoint> Sender<E> {
             WsMessage::Text(t) => Message::Text(t),
             WsMessage::Binary(b) => Message::Bytes(b),
         };
-        self.sink.send(gloo_msg).await.map_err(|_| SendError::Closed)
+        self.sink
+            .send(gloo_msg)
+            .await
+            .map_err(|_| SendError::Closed)
     }
 }
 
@@ -142,9 +145,7 @@ impl<E: WsEndpoint> Receiver<E> {
                         Message::Text(t) => WsMessage::Text(t),
                         Message::Bytes(b) => WsMessage::Binary(b),
                     };
-                    return Some(
-                        E::ServerMsg::decode(ws_msg).map_err(RecvError::Decode),
-                    );
+                    return Some(E::ServerMsg::decode(ws_msg).map_err(RecvError::Decode));
                 }
             }
         }

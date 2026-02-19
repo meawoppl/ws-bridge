@@ -11,10 +11,9 @@ use common::{ClientMsg, EchoEndpoint, ServerMsg};
 
 #[tokio::main]
 async fn main() {
-    let mut conn =
-        ws_bridge::native_client::connect::<EchoEndpoint>("ws://127.0.0.1:3000")
-            .await
-            .expect("Failed to connect");
+    let mut conn = ws_bridge::native_client::connect::<EchoEndpoint>("ws://127.0.0.1:3000")
+        .await
+        .expect("Failed to connect");
 
     println!("Connected to server");
 
@@ -26,11 +25,9 @@ async fn main() {
 
     // Send a few messages
     for text in ["Hello", "World", "ws-bridge is great"] {
-        conn.send(ClientMsg::Say {
-            text: text.into(),
-        })
-        .await
-        .unwrap();
+        conn.send(ClientMsg::Say { text: text.into() })
+            .await
+            .unwrap();
 
         match conn.recv().await {
             Some(Ok(ServerMsg::Echo { payload })) => println!("Echo: {payload}"),

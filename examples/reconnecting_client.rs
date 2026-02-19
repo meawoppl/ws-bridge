@@ -22,10 +22,8 @@ async fn main() {
         multiplier: 2.0,
     };
 
-    let mut ws = ws_bridge::reconnect::connect_native::<EchoEndpoint>(
-        "ws://127.0.0.1:3000".into(),
-        config,
-    );
+    let mut ws =
+        ws_bridge::reconnect::connect_native::<EchoEndpoint>("ws://127.0.0.1:3000".into(), config);
 
     println!("Reconnecting client started. Press Ctrl+C to exit.");
     println!("Start the echo_server example to see messages flow.");

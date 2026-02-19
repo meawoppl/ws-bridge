@@ -83,9 +83,7 @@ impl WsEndpoint for PushOnlyEndpoint {
 
 // -- Helper: start a test server --
 
-async fn start_server(
-    app: axum::Router,
-) -> (SocketAddr, tokio::task::JoinHandle<()>) {
+async fn start_server(app: axum::Router) -> (SocketAddr, tokio::task::JoinHandle<()>) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let handle = tokio::spawn(async move {
@@ -122,10 +120,9 @@ async fn json_echo_round_trip() {
     let (addr, _server) = start_server(app).await;
     let base_url = format!("ws://{}", addr);
 
-    let mut conn =
-        ws_bridge::native_client::connect::<TestEndpoint>(&base_url)
-            .await
-            .unwrap();
+    let mut conn = ws_bridge::native_client::connect::<TestEndpoint>(&base_url)
+        .await
+        .unwrap();
 
     // Receive hello
     let msg = conn.recv().await.unwrap().unwrap();
@@ -175,10 +172,9 @@ async fn binary_codec_round_trip() {
     let (addr, _server) = start_server(app).await;
     let base_url = format!("ws://{}", addr);
 
-    let mut conn =
-        ws_bridge::native_client::connect::<BinaryEndpoint>(&base_url)
-            .await
-            .unwrap();
+    let mut conn = ws_bridge::native_client::connect::<BinaryEndpoint>(&base_url)
+        .await
+        .unwrap();
 
     let payload = vec![0xDE, 0xAD, 0xBE, 0xEF];
     conn.send(BinaryFrame {
@@ -267,16 +263,14 @@ async fn upgrade_fn_manual_handler() {
         })
     }
 
-    let app =
-        axum::Router::new().route(TestEndpoint::PATH, axum::routing::get(my_handler));
+    let app = axum::Router::new().route(TestEndpoint::PATH, axum::routing::get(my_handler));
 
     let (addr, _server) = start_server(app).await;
     let base_url = format!("ws://{}", addr);
 
-    let mut conn =
-        ws_bridge::native_client::connect::<TestEndpoint>(&base_url)
-            .await
-            .unwrap();
+    let mut conn = ws_bridge::native_client::connect::<TestEndpoint>(&base_url)
+        .await
+        .unwrap();
 
     let msg = conn.recv().await.unwrap().unwrap();
     assert_eq!(
@@ -292,29 +286,25 @@ async fn into_connection_fn() {
     // Test using into_connection() for max control
     let app = axum::Router::new().route(
         TestEndpoint::PATH,
-        axum::routing::get(
-            |ws: axum::extract::ws::WebSocketUpgrade| async move {
-                ws.max_message_size(1024 * 1024)
-                    .on_upgrade(|socket| async move {
-                        let mut conn =
-                            ws_bridge::server::into_connection::<TestEndpoint>(socket);
-                        conn.send(ServerMsg::Hello {
-                            greeting: "into_conn".into(),
-                        })
-                        .await
-                        .unwrap();
+        axum::routing::get(|ws: axum::extract::ws::WebSocketUpgrade| async move {
+            ws.max_message_size(1024 * 1024)
+                .on_upgrade(|socket| async move {
+                    let mut conn = ws_bridge::server::into_connection::<TestEndpoint>(socket);
+                    conn.send(ServerMsg::Hello {
+                        greeting: "into_conn".into(),
                     })
-            },
-        ),
+                    .await
+                    .unwrap();
+                })
+        }),
     );
 
     let (addr, _server) = start_server(app).await;
     let base_url = format!("ws://{}", addr);
 
-    let mut conn =
-        ws_bridge::native_client::connect::<TestEndpoint>(&base_url)
-            .await
-            .unwrap();
+    let mut conn = ws_bridge::native_client::connect::<TestEndpoint>(&base_url)
+        .await
+        .unwrap();
 
     let msg = conn.recv().await.unwrap().unwrap();
     assert_eq!(
@@ -363,10 +353,9 @@ async fn handler_with_state() {
     let (addr, _server) = start_server(app).await;
     let base_url = format!("ws://{}", addr);
 
-    let mut conn =
-        ws_bridge::native_client::connect::<TestEndpoint>(&base_url)
-            .await
-            .unwrap();
+    let mut conn = ws_bridge::native_client::connect::<TestEndpoint>(&base_url)
+        .await
+        .unwrap();
 
     let msg = conn.recv().await.unwrap().unwrap();
     assert_eq!(
@@ -394,10 +383,9 @@ async fn connect_to_url_bypasses_path() {
     let (addr, _server) = start_server(app).await;
     let url = format!("ws://{}/custom/path", addr);
 
-    let mut conn =
-        ws_bridge::native_client::connect_to_url::<TestEndpoint>(&url)
-            .await
-            .unwrap();
+    let mut conn = ws_bridge::native_client::connect_to_url::<TestEndpoint>(&url)
+        .await
+        .unwrap();
 
     let msg = conn.recv().await.unwrap().unwrap();
     assert_eq!(
@@ -429,10 +417,9 @@ async fn push_only_endpoint_with_no_messages() {
     let (addr, _server) = start_server(app).await;
     let base_url = format!("ws://{}", addr);
 
-    let mut conn =
-        ws_bridge::native_client::connect::<PushOnlyEndpoint>(&base_url)
-            .await
-            .unwrap();
+    let mut conn = ws_bridge::native_client::connect::<PushOnlyEndpoint>(&base_url)
+        .await
+        .unwrap();
 
     let msg = conn.recv().await.unwrap().unwrap();
     assert_eq!(
@@ -506,9 +493,7 @@ async fn reconnecting_ws_reconnects_on_drop() {
                 as std::pin::Pin<
                     Box<
                         dyn std::future::Future<
-                                Output = Option<
-                                    ws_bridge::WsConnection<ClientMsg, ServerMsg>,
-                                >,
+                                Output = Option<ws_bridge::WsConnection<ClientMsg, ServerMsg>>,
                             > + Send,
                     >,
                 >

@@ -8,7 +8,7 @@ use futures_util::stream::StreamExt;
 use futures_util::SinkExt;
 
 use crate::codec::WsMessage;
-use crate::connection::{ErasedSink, ErasedStream, WsConnection};
+use crate::connection::{BoxFuture, ErasedSink, ErasedStream, WsConnection};
 use crate::WsEndpoint;
 
 /// A server-side typed WebSocket connection.
@@ -160,10 +160,7 @@ fn wrap_axum_socket<E: WsEndpoint>(socket: WebSocket) -> Connection<E> {
 struct AxumSink(futures_util::stream::SplitSink<WebSocket, Message>);
 
 impl ErasedSink for AxumSink {
-    fn send(
-        &mut self,
-        msg: WsMessage,
-    ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), ()>> + Send + '_>> {
+    fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), ()>> {
         Box::pin(async move {
             let axum_msg = match msg {
                 WsMessage::Text(t) => Message::Text(t),
@@ -173,9 +170,7 @@ impl ErasedSink for AxumSink {
         })
     }
 
-    fn close(
-        &mut self,
-    ) -> std::pin::Pin<Box<dyn Future<Output = Result<(), ()>> + Send + '_>> {
+    fn close(&mut self) -> BoxFuture<'_, Result<(), ()>> {
         Box::pin(async move { self.0.close().await.map_err(|_| ()) })
     }
 }
@@ -183,11 +178,7 @@ impl ErasedSink for AxumSink {
 struct AxumStream(futures_util::stream::SplitStream<WebSocket>);
 
 impl ErasedStream for AxumStream {
-    fn next(
-        &mut self,
-    ) -> std::pin::Pin<
-        Box<dyn Future<Output = Option<Result<WsMessage, ()>>> + Send + '_>,
-    > {
+    fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, ()>>> {
         Box::pin(async move {
             loop {
                 match self.0.next().await {
