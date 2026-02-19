@@ -2,6 +2,11 @@
 name = "ws-bridge"
 version = "0.1.0"
 edition = "2021"
+description = "Strongly-typed WebSocket endpoints for Rust — define once, use everywhere (axum server, yew/gloo browser client, tokio-tungstenite native client)"
+license = "MIT"
+repository = "https://github.com/meawoppl/ws-bridge"
+keywords = ["websocket", "axum", "yew", "typed", "async"]
+categories = ["web-programming::websocket", "network-programming"]
 
 [features]
 default = []
