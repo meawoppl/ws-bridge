@@ -1,6 +1,6 @@
 [package]
 name = "ws-bridge"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Strongly-typed WebSocket endpoints for Rust — define once, use everywhere (axum server, yew/gloo browser client, tokio-tungstenite native client)"
 license = "MIT"
@@ -20,7 +20,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # server
-axum = { version = "0.7", features = ["ws"], optional = true }
+axum = { version = "0.8", features = ["ws"], optional = true }
 tokio = { version = "1", features = ["sync", "macros", "rt", "time"], optional = true }
 futures-util = { version = "0.3", features = ["sink"], optional = true }
 
@@ -30,8 +30,8 @@ wasm-bindgen-futures = { version = "0.4", optional = true }
 web-sys = { version = "0.3", features = ["Window", "Location"], optional = true }
 
 # native-client
-tokio-tungstenite = { version = "0.24", optional = true, features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.28", optional = true, features = ["rustls-tls-webpki-roots"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
-axum = { version = "0.7", features = ["ws"] }
+axum = { version = "0.8", features = ["ws"] }

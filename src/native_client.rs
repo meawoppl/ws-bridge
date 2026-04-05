@@ -71,15 +71,20 @@ impl ErasedSink for TungsteniteSink {
     fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), ()>> {
         Box::pin(async move {
             let tung_msg = match msg {
-                WsMessage::Text(t) => tungstenite::Message::Text(t),
-                WsMessage::Binary(b) => tungstenite::Message::Binary(b),
+                WsMessage::Text(t) => tungstenite::Message::Text(t.into()),
+                WsMessage::Binary(b) => tungstenite::Message::Binary(b.into()),
             };
             self.0.send(tung_msg).await.map_err(|_| ())
         })
     }
 
     fn close(&mut self) -> BoxFuture<'_, Result<(), ()>> {
-        Box::pin(async move { self.0.close().await.map_err(|_| ()) })
+        Box::pin(async move {
+            self.0
+                .send(tungstenite::Message::Close(None))
+                .await
+                .map_err(|_| ())
+        })
     }
 }
 
@@ -94,10 +99,10 @@ impl ErasedStream for TungsteniteStream {
                     Some(Err(_)) => return Some(Err(())),
                     Some(Ok(msg)) => match msg {
                         tungstenite::Message::Text(t) => {
-                            return Some(Ok(WsMessage::Text(t)));
+                            return Some(Ok(WsMessage::Text(t.to_string())));
                         }
                         tungstenite::Message::Binary(b) => {
-                            return Some(Ok(WsMessage::Binary(b)));
+                            return Some(Ok(WsMessage::Binary(b.to_vec())));
                         }
                         tungstenite::Message::Close(_) => return None,
                         tungstenite::Message::Ping(_)
