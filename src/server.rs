@@ -40,7 +40,7 @@ pub type Connection<E> = WsConnection<<E as WsEndpoint>::ServerMsg, <E as WsEndp
 pub fn handler<E, F, Fut>(callback: F) -> MethodRouter
 where
     E: WsEndpoint,
-    F: FnOnce(Connection<E>) -> Fut + Clone + Send + 'static,
+    F: FnOnce(Connection<E>) -> Fut + Clone + Send + Sync + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
     routing::get(move |ws: WebSocketUpgrade| async move {
@@ -78,7 +78,7 @@ pub fn handler_with_state<E, F, Fut, S>(callback: F) -> MethodRouter<S>
 where
     E: WsEndpoint,
     S: Clone + Send + Sync + 'static,
-    F: FnOnce(Connection<E>, S) -> Fut + Clone + Send + 'static,
+    F: FnOnce(Connection<E>, S) -> Fut + Clone + Send + Sync + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
     routing::get(
@@ -163,15 +163,15 @@ impl ErasedSink for AxumSink {
     fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), ()>> {
         Box::pin(async move {
             let axum_msg = match msg {
-                WsMessage::Text(t) => Message::Text(t),
-                WsMessage::Binary(b) => Message::Binary(b),
+                WsMessage::Text(t) => Message::Text(t.into()),
+                WsMessage::Binary(b) => Message::Binary(b.into()),
             };
             self.0.send(axum_msg).await.map_err(|_| ())
         })
     }
 
     fn close(&mut self) -> BoxFuture<'_, Result<(), ()>> {
-        Box::pin(async move { self.0.close().await.map_err(|_| ()) })
+        Box::pin(async move { self.0.send(Message::Close(None)).await.map_err(|_| ()) })
     }
 }
 
@@ -185,8 +185,8 @@ impl ErasedStream for AxumStream {
                     None => return None,
                     Some(Err(_)) => return Some(Err(())),
                     Some(Ok(msg)) => match msg {
-                        Message::Text(t) => return Some(Ok(WsMessage::Text(t))),
-                        Message::Binary(b) => return Some(Ok(WsMessage::Binary(b))),
+                        Message::Text(t) => return Some(Ok(WsMessage::Text(t.to_string()))),
+                        Message::Binary(b) => return Some(Ok(WsMessage::Binary(b.to_vec()))),
                         Message::Close(_) => return None,
                         // Skip ping/pong — axum handles these automatically.
                         Message::Ping(_) | Message::Pong(_) => continue,
