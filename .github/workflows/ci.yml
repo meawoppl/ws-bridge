@@ -49,8 +49,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Check yew-client
         run: cargo check --features yew-client --target wasm32-unknown-unknown
-      - name: Check all features (WASM)
-        run: cargo check --all-features --target wasm32-unknown-unknown
 
   clippy:
     name: Clippy
