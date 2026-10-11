@@ -74,6 +74,7 @@ where
     connect_fn: F,
     conn: Option<WsConnection<S, R>>,
     attempt: u32,
+    connected_at: Option<tokio::time::Instant>,
     _types: PhantomData<(S, R)>,
 }
 
@@ -94,6 +95,7 @@ where
             connect_fn,
             conn: None,
             attempt: 0,
+            connected_at: None,
             _types: PhantomData,
         }
     }
@@ -110,12 +112,11 @@ where
             if let Some(ref mut conn) = self.conn {
                 match conn.send(msg.clone()).await {
                     Ok(()) => {
-                        self.attempt = 0;
                         return Ok(());
                     }
                     Err(e @ SendError::Encode(_)) => return Err(e),
                     Err(SendError::Closed) => {
-                        self.conn = None;
+                        self.drop_connection();
                         continue;
                     }
                 }
@@ -140,16 +141,14 @@ where
             if let Some(ref mut conn) = self.conn {
                 match conn.recv().await {
                     Some(Ok(msg)) => {
-                        self.attempt = 0;
                         return Some(Ok(msg));
                     }
                     Some(Err(RecvError::Decode(e))) => {
-                        self.attempt = 0;
                         return Some(Err(RecvError::Decode(e)));
                     }
                     Some(Err(RecvError::Closed)) | None => {
                         // Connection lost, reconnect.
-                        self.conn = None;
+                        self.drop_connection();
                         continue;
                     }
                 }
@@ -159,7 +158,7 @@ where
 
     /// Forces a reconnection, dropping the current connection if any.
     pub async fn reconnect(&mut self) {
-        self.conn = None;
+        self.drop_connection();
         loop {
             if self.attempt > 0 {
                 let delay = self
@@ -171,10 +170,21 @@ where
 
             if let Some(conn) = (self.connect_fn)().await {
                 self.conn = Some(conn);
-                self.attempt = 0;
+                self.connected_at = Some(tokio::time::Instant::now());
                 return;
             }
         }
+    }
+
+    fn drop_connection(&mut self) {
+        if self
+            .connected_at
+            .take()
+            .is_some_and(|at| at.elapsed() >= Duration::from_secs(30))
+        {
+            self.attempt = 0;
+        }
+        self.conn = None;
     }
 }
 
@@ -243,6 +253,41 @@ mod tests {
         assert!(matches!(result, Err(SendError::Encode(_))));
         ws.send(Message { invalid: false }).await.unwrap();
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn short_connections_keep_backoff_and_stable_connections_reset_it() {
+        let mut ws = ReconnectingWs::new(BackoffConfig::default(), || async {
+            Some(connection::<Message, Message>())
+        });
+        ws.reconnect().await;
+        let start = tokio::time::Instant::now();
+        ws.reconnect().await;
+        assert_eq!(start.elapsed(), Duration::from_secs(1));
+        let start = tokio::time::Instant::now();
+        ws.reconnect().await;
+        assert_eq!(start.elapsed(), Duration::from_secs(2));
+        tokio::time::sleep(Duration::from_secs(30)).await;
+        let start = tokio::time::Instant::now();
+        ws.reconnect().await;
+        assert_eq!(start.elapsed(), Duration::ZERO);
+        let start = tokio::time::Instant::now();
+        ws.reconnect().await;
+        assert_eq!(start.elapsed(), Duration::from_secs(1));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn immediately_closed_connections_do_not_spin() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let count = calls.clone();
+        let mut ws = ReconnectingWs::new(BackoffConfig::default(), move || {
+            count.fetch_add(1, Ordering::SeqCst);
+            async { Some(connection::<Message, Message>()) }
+        });
+        assert!(tokio::time::timeout(Duration::from_millis(3500), ws.recv())
+            .await
+            .is_err());
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
     }
 }
 

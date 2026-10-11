@@ -113,7 +113,8 @@ ws.reconnect().await;
 
 ## Retry behavior
 
-- On successful connect or message exchange, the attempt counter resets to 0.
+- The attempt counter resets after a connection lasts at least 30 seconds.
+- Successful handshakes and messages on short-lived connections retain the backoff.
 - On connection failure, the delay increases exponentially up to `max`.
 - Reconnection retries indefinitely — there is no max attempt limit.
 - `recv()` never returns `None` (it always reconnects), so loops using `while let Some(...)` run forever.
