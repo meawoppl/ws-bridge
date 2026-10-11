@@ -439,6 +439,7 @@ async fn push_only_endpoint_with_no_messages() {
 }
 
 #[tokio::test]
+#[cfg(feature = "reconnect")]
 async fn reconnecting_ws_reconnects_on_drop() {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;

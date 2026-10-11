@@ -35,3 +35,23 @@ tokio-tungstenite = { version = "0.28", optional = true, features = ["rustls-tls
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
 axum = { version = "0.8", features = ["ws"] }
+
+[[example]]
+name = "echo_server"
+required-features = ["server"]
+
+[[example]]
+name = "stateful_server"
+required-features = ["server"]
+
+[[example]]
+name = "echo_client"
+required-features = ["native-client"]
+
+[[example]]
+name = "reconnecting_client"
+required-features = ["native-client", "reconnect"]
+
+[[test]]
+name = "integration"
+required-features = ["server", "native-client"]
