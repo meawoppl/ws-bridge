@@ -19,6 +19,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run tests
         run: cargo test --features "server,native-client,reconnect"
+      - name: Compile all documentation examples
+        run: cargo test --doc --all-features
       - name: Test default features
         run: cargo test
       - name: Test server and native client without reconnect

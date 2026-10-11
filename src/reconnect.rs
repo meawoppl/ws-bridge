@@ -36,12 +36,21 @@ impl BackoffConfig {
 /// A reconnecting WebSocket wrapper.
 ///
 /// Automatically reconnects with exponential backoff when the connection
-/// drops. Calls the user-provided `on_connect` callback after each
-/// successful reconnection.
+/// drops. Use the connection factory for setup that must run on every
+/// connection. Retry backoff resets after a connection lasts 30 seconds.
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use ws_bridge::WsEndpoint;
+/// # struct SessionSocket;
+/// # impl WsEndpoint for SessionSocket {
+/// #     const PATH: &'static str = "/ws/session";
+/// #     type ServerMsg = String;
+/// #     type ClientMsg = String;
+/// # }
+/// # async fn connect() -> Option<ws_bridge::WsConnection<String, String>> { None }
+/// # async fn example() {
 /// use ws_bridge::reconnect::{ReconnectingWs, BackoffConfig};
 /// use std::time::Duration;
 ///
@@ -53,7 +62,7 @@ impl BackoffConfig {
 ///
 /// let mut ws = ReconnectingWs::new(
 ///     config,
-///     || async { ws_bridge::native_client::connect::<MyEndpoint>("ws://localhost:3000").await.ok() },
+///     connect,
 /// );
 ///
 /// while let Some(result) = ws.recv().await {
@@ -62,6 +71,7 @@ impl BackoffConfig {
 ///         Err(e) => { /* decode error */ }
 ///     }
 /// }
+/// # }
 /// ```
 pub struct ReconnectingWs<S, R, F, Fut>
 where
@@ -295,10 +305,17 @@ mod tests {
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use ws_bridge::WsEndpoint;
+/// # struct SessionSocket;
+/// # impl WsEndpoint for SessionSocket {
+/// #     const PATH: &'static str = "/ws/session";
+/// #     type ServerMsg = String;
+/// #     type ClientMsg = String;
+/// # }
 /// use ws_bridge::reconnect::{self, BackoffConfig};
 ///
-/// let mut ws = reconnect::connect_native::<MyEndpoint>(
+/// let mut ws = reconnect::connect_native::<SessionSocket>(
 ///     "ws://localhost:3000".into(),
 ///     BackoffConfig::default(),
 /// );

@@ -24,14 +24,22 @@ impl std::fmt::Display for ConnectError {
 ///
 /// # Example
 ///
-/// ```ignore
-/// let mut conn = ws_bridge::yew_client::connect::<SessionSocket>()?;
-/// conn.send(ClientToServer::Register { ... }).await?;
+/// ```no_run
+/// # use ws_bridge::WsEndpoint;
+/// # struct SessionSocket;
+/// # impl WsEndpoint for SessionSocket {
+/// #     const PATH: &'static str = "/ws/session";
+/// #     type ServerMsg = String;
+/// #     type ClientMsg = String;
+/// # }
+/// # async fn example() -> Result<(), ws_bridge::SendError> {
+/// let mut conn = ws_bridge::yew_client::connect::<SessionSocket>().unwrap();
+/// conn.send("hello".to_owned()).await?;
 /// while let Some(Ok(msg)) = conn.recv().await {
-///     match msg {
-///         ServerToClient::ClaudeOutput { content } => { /* ... */ }
-///     }
+///     println!("{msg}");
 /// }
+/// # Ok(())
+/// # }
 /// ```
 pub fn connect<E: WsEndpoint>() -> Result<Connection<E>, ConnectError> {
     let url = derive_ws_url(E::PATH);
