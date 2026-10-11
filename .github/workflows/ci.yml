@@ -63,9 +63,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Clippy (server + native-client + reconnect)
-        run: cargo clippy --features "server,native-client,reconnect" -- -D warnings
+        run: cargo clippy --all-features -- -D warnings
+      - name: Clippy browser client (WASM)
+        run: cargo clippy --features yew-client --target wasm32-unknown-unknown -- -D warnings
 
   fmt:
     name: Format
