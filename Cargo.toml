@@ -2,7 +2,7 @@
 name = "ws-bridge"
 version = "0.2.1"
 edition = "2021"
-description = "Strongly-typed WebSocket endpoints for Rust — define once, use everywhere (axum server, yew/gloo browser client, tokio-tungstenite native client)"
+description = "Strongly-typed WebSocket endpoints for Rust — axum, Actix Web, Warp, Rocket, Poem, Salvo, Hyper, browser and native clients"
 license = "MIT"
 repository = "https://github.com/meawoppl/ws-bridge"
 keywords = ["websocket", "axum", "yew", "typed", "async"]
@@ -17,6 +17,13 @@ server = ["dep:axum", "dep:futures-util", "dep:tokio"]
 yew-client = ["dep:gloo-net", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:futures-util"]
 native-client = ["dep:tokio-tungstenite", "dep:tokio", "dep:futures-util"]
 reconnect = ["dep:tokio", "dep:futures-util"]
+transport = ["dep:futures-util"]
+actix-server = ["dep:actix-web", "dep:actix-ws", "dep:actix-rt"]
+warp-server = ["dep:warp", "transport"]
+rocket-server = ["dep:rocket", "dep:rocket_ws", "transport"]
+poem-server = ["dep:poem", "transport"]
+salvo-server = ["dep:salvo", "transport"]
+hyper-server = ["dep:hyper-tungstenite", "dep:tokio", "transport"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -35,9 +42,24 @@ web-sys = { version = "0.3", features = ["Window", "Location"], optional = true 
 # native-client
 tokio-tungstenite = { version = "0.28", optional = true, features = ["rustls-tls-webpki-roots"] }
 
+# Additional server adapters (enabled independently).
+actix-web = { version = "4", default-features = false, optional = true }
+actix-ws = { version = "0.4", optional = true }
+actix-rt = { version = "2", default-features = false, features = ["net", "signal"], optional = true }
+warp = { version = "0.4", default-features = false, features = ["websocket", "server"], optional = true }
+rocket = { version = "0.5", default-features = false, optional = true }
+rocket_ws = { version = "0.1", optional = true }
+poem = { version = "3", default-features = false, features = ["websocket", "server"], optional = true }
+salvo = { version = "1", default-features = false, features = ["websocket", "server", "http1", "server-handle"], optional = true }
+hyper-tungstenite = { version = "0.30", optional = true }
+
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
 axum = { version = "0.8", features = ["ws"] }
+
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
 
 [[example]]
 name = "echo_server"
@@ -58,3 +80,31 @@ required-features = ["native-client", "reconnect"]
 [[test]]
 name = "integration"
 required-features = ["server", "native-client"]
+
+[[test]]
+name = "server_adapters"
+required-features = ["native-client", "transport"]
+
+[[example]]
+name = "actix_echo_server"
+required-features = ["actix-server"]
+
+[[example]]
+name = "warp_echo_server"
+required-features = ["warp-server"]
+
+[[example]]
+name = "rocket_echo_server"
+required-features = ["rocket-server"]
+
+[[example]]
+name = "poem_echo_server"
+required-features = ["poem-server"]
+
+[[example]]
+name = "salvo_echo_server"
+required-features = ["salvo-server"]
+
+[[example]]
+name = "hyper_echo_server"
+required-features = ["hyper-server"]

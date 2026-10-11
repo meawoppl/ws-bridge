@@ -2,7 +2,7 @@
 
 Strongly-typed WebSocket endpoints for Rust — define once, use everywhere.
 
-**Server** (axum) · **Browser client** (yew/gloo) · **Native client** (tokio-tungstenite)
+**Servers** (axum, Actix Web, Warp, Rocket, Poem, Salvo, Hyper) · **Browser client** (yew/gloo) · **Native client** (tokio-tungstenite)
 
 [![Crates.io](https://img.shields.io/crates/v/ws-bridge.svg)](https://crates.io/crates/ws-bridge)
 [![Docs.rs](https://docs.rs/ws-bridge/badge.svg)](https://docs.rs/ws-bridge)
@@ -97,6 +97,13 @@ Enable only what you need:
 | `server` | axum WebSocket handlers | axum, tokio, futures-util |
 | `yew-client` | Browser WebSocket client (WASM) | gloo-net, wasm-bindgen-futures, web-sys |
 | `native-client` | tokio-tungstenite client | tokio-tungstenite, tokio, futures-util |
+| `actix-server` | Actix Web 4 / actix-ws 0.4 typed handlers | actix-web, actix-ws, actix-rt |
+| `warp-server` | Warp 0.4 typed upgrades | warp, futures-util |
+| `rocket-server` | Rocket 0.5 typed channels | rocket, rocket_ws, futures-util |
+| `poem-server` | Poem 3 typed upgrades | poem, futures-util |
+| `salvo-server` | Salvo 1 typed upgrades | salvo, futures-util |
+| `hyper-server` | Hyper 1 upgraded connections | hyper-tungstenite, tokio, futures-util |
+| `transport` | Custom WebSocket transport conversion | futures-util |
 | `reconnect` | Exponential backoff reconnection | tokio, futures-util |
 
 ```toml
@@ -111,6 +118,9 @@ ws-bridge = { version = "0.2.1", features = ["yew-client"] }
 ws-bridge = { version = "0.2.1", features = ["native-client", "reconnect"] }
 ```
 
+The existing `server` feature remains the axum adapter. See the
+[additional server guide](docs/server-adapters.md) for the other frameworks.
+
 ## Key concepts
 
 - **`WsEndpoint`** — A trait you implement on a unit struct. Defines `PATH`, `ServerMsg`, and `ClientMsg`. This is the single source of truth shared between server and clients.
@@ -120,6 +130,7 @@ ws-bridge = { version = "0.2.1", features = ["native-client", "reconnect"] }
 
 ## Documentation
 
+- **[Additional Server Guide](docs/server-adapters.md)** — Actix Web, Warp, Rocket, Poem, Salvo, Hyper, and custom transports
 - **[Server Guide](docs/server.md)** — axum handlers, state extraction, pre-upgrade auth, manual upgrades
 - **[Browser Client Guide](docs/yew-client.md)** — WASM/yew usage, `!Send` constraints, Yew component patterns
 - **[Native Client Guide](docs/native-client.md)** — tokio-tungstenite connections, TLS
