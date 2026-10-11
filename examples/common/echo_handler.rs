@@ -5,6 +5,9 @@ macro_rules! echo_handler {
     ($conn_type:ty) => {
         |conn: $conn_type| async move {
             let (mut tx, mut rx) = conn.split();
+            if tx.send(common::ServerMsg::Welcome {
+                message: "Hello! Send me messages and I'll echo them back.".into(),
+            }).await.is_err() { return; }
             while let Some(result) = rx.recv().await {
                 match result {
                     Ok(common::ClientMsg::Say { text }) => {
