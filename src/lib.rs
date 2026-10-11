@@ -32,3 +32,24 @@ pub trait WsEndpoint {
     /// Messages sent FROM the client TO the server.
     type ClientMsg: WsCodec + Clone + Send + 'static;
 }
+
+#[cfg(feature = "transport")]
+pub mod transport;
+
+#[cfg(feature = "actix-server")]
+pub mod actix_server;
+
+#[cfg(feature = "warp-server")]
+pub mod warp_server;
+
+#[cfg(feature = "rocket-server")]
+pub mod rocket_server;
+
+#[cfg(feature = "poem-server")]
+pub mod poem_server;
+
+#[cfg(feature = "salvo-server")]
+pub mod salvo_server;
+
+#[cfg(feature = "hyper-server")]
+pub mod hyper_server;
