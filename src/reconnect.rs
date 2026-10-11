@@ -100,7 +100,8 @@ where
 
     /// Sends a message, reconnecting if necessary.
     ///
-    /// Returns `Err` if the message could not be sent even after reconnecting.
+    /// Encoding errors are returned immediately without dropping the connection.
+    /// Connection failures are retried indefinitely.
     pub async fn send(&mut self, msg: S) -> Result<(), SendError> {
         loop {
             if self.conn.is_none() {
@@ -112,7 +113,8 @@ where
                         self.attempt = 0;
                         return Ok(());
                     }
-                    Err(_) => {
+                    Err(e @ SendError::Encode(_)) => return Err(e),
+                    Err(SendError::Closed) => {
                         self.conn = None;
                         continue;
                     }
@@ -173,6 +175,74 @@ where
                 return;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::connection::{BoxFuture, ErasedSink, ErasedStream};
+    use crate::{DecodeError, EncodeError, WsMessage};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    struct Sink;
+    impl ErasedSink for Sink {
+        fn send(&mut self, _: WsMessage) -> BoxFuture<'_, Result<(), ()>> {
+            Box::pin(async { Ok(()) })
+        }
+        fn close(&mut self) -> BoxFuture<'_, Result<(), ()>> {
+            Box::pin(async { Ok(()) })
+        }
+    }
+    struct ClosedStream;
+    impl ErasedStream for ClosedStream {
+        fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, ()>>> {
+            Box::pin(async { None })
+        }
+    }
+    fn connection<S: WsCodec, R: WsCodec>() -> WsConnection<S, R> {
+        WsConnection {
+            sink: Box::new(Sink),
+            stream: Box::new(ClosedStream),
+            _types: PhantomData,
+        }
+    }
+
+    #[derive(Clone)]
+    struct Message {
+        invalid: bool,
+    }
+    impl WsCodec for Message {
+        fn encode(&self) -> Result<WsMessage, EncodeError> {
+            if self.invalid {
+                Err(EncodeError::Custom("invalid message".into()))
+            } else {
+                Ok(WsMessage::Text("valid".into()))
+            }
+        }
+        fn decode(_: WsMessage) -> Result<Self, DecodeError> {
+            Ok(Self { invalid: false })
+        }
+    }
+
+    #[tokio::test]
+    async fn encoding_error_preserves_connection() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let count = calls.clone();
+        let mut ws = ReconnectingWs::new(BackoffConfig::default(), move || {
+            count.fetch_add(1, Ordering::SeqCst);
+            async { Some(connection::<Message, Message>()) }
+        });
+        let result =
+            tokio::time::timeout(Duration::from_secs(1), ws.send(Message { invalid: true }))
+                .await
+                .unwrap();
+        assert!(matches!(result, Err(SendError::Encode(_))));
+        ws.send(Message { invalid: false }).await.unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 }
 
