@@ -109,13 +109,13 @@ Enable only what you need:
 ```toml
 [dependencies]
 # Server crate
-ws-bridge = { version = "0.2.1", features = ["server"] }
+ws-bridge = { version = "1.0.0", features = ["server"] }
 
 # Frontend crate (WASM)
-ws-bridge = { version = "0.2.1", features = ["yew-client"] }
+ws-bridge = { version = "1.0.0", features = ["yew-client"] }
 
 # CLI / daemon crate
-ws-bridge = { version = "0.2.1", features = ["native-client", "reconnect"] }
+ws-bridge = { version = "1.0.0", features = ["native-client", "reconnect"] }
 ```
 
 The existing `server` feature remains the axum adapter. See the
@@ -158,3 +158,9 @@ cargo run --example reconnecting_client --features "native-client,reconnect"
 ## License
 
 MIT
+
+## 1.0 compatibility
+
+Rust 1.94 or later is required. Default features are empty; server and client
+transports are opt-in. See [migration notes](docs/migration-1.0.md),
+[security guidance](SECURITY.md), and [contributor/release checks](CONTRIBUTING.md).

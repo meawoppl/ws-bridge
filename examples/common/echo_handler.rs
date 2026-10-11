@@ -13,8 +13,9 @@ macro_rules! echo_handler {
                     Ok(common::ClientMsg::Say { text }) => {
                         if tx.send(common::ServerMsg::Echo { payload: text }).await.is_err() { break; }
                     }
-                    Ok(common::ClientMsg::Quit) | Err(ws_bridge::RecvError::Closed) => break,
+                    Ok(common::ClientMsg::Quit) => break,
                     Err(ws_bridge::RecvError::Decode(error)) => eprintln!("invalid message: {error}"),
+                    Err(_) => break,
                 }
             }
             let _ = tx.close().await;

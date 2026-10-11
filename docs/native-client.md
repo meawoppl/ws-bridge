@@ -6,7 +6,7 @@ The `native-client` feature provides a typed WebSocket client using [tokio-tungs
 
 ```toml
 [dependencies]
-ws-bridge = { version = "0.2.1", features = ["native-client"] }
+ws-bridge = { version = "1.0.0", features = ["native-client"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -49,7 +49,7 @@ while let Some(result) = conn.recv().await {
         Ok(ServerMsg::Echo { payload }) => println!("Got: {payload}"),
         Ok(ServerMsg::Welcome { message }) => println!("Server: {message}"),
         Err(ws_bridge::RecvError::Decode(e)) => eprintln!("Bad message: {e}"),
-        Err(ws_bridge::RecvError::Closed) => break,
+        Err(_) => break,
         _ => {}
     }
 }
@@ -107,3 +107,11 @@ tokio-tungstenite handles `wss://` URLs automatically using the system's TLS sta
 ```rust
 let mut conn = native_client::connect::<MyEndpoint>("wss://example.com").await?;
 ```
+
+## Handshake headers and limits
+
+`connect_request::<Endpoint>(request, Some(config))` accepts an
+`IntoClientRequest` and `WebSocketConfig` (both re-exported by `native_client`).
+Convert a URL into a request before adding authorization or subprotocol headers,
+and inspect the returned handshake response. Set message/frame limits in the config.
+Invalid write-buffer limits return a connection error rather than panicking.

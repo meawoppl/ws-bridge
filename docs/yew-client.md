@@ -8,7 +8,7 @@ Enable the feature in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ws-bridge = { version = "0.2.1", features = ["yew-client"] }
+ws-bridge = { version = "1.0.0", features = ["yew-client"] }
 ```
 
 ## Connecting
@@ -60,7 +60,7 @@ while let Some(result) = conn.recv().await {
     match result {
         Ok(msg) => { /* handle ServerMsg */ }
         Err(ws_bridge::RecvError::Decode(e)) => { /* bad message */ }
-        Err(ws_bridge::RecvError::Closed) => break,
+        Err(_) => break,
     }
 }
 ```
@@ -197,8 +197,8 @@ The `yew-client` feature only compiles for `wasm32-unknown-unknown`. Add it to y
 ```toml
 # frontend/Cargo.toml
 [dependencies]
-ws-bridge = { version = "0.2.1", features = ["yew-client"] }
+ws-bridge = { version = "1.0.0", features = ["yew-client"] }
 
 # server/Cargo.toml — don't include yew-client here
-ws-bridge = { version = "0.2.1", features = ["server"] }
+ws-bridge = { version = "1.0.0", features = ["server"] }
 ```

@@ -2,6 +2,7 @@
 //!
 //! Framework adapters use this same conversion layer. Applications can supply
 //! conversions for transports not covered by a built-in adapter.
+use crate::TransportError;
 use std::marker::PhantomData;
 
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
@@ -34,8 +35,8 @@ pub enum Frame {
 /// # type ClientMsg = String;
 /// # }
 /// # fn example<T>(socket: T)
-/// # where T: futures_util::Sink<Option<WsMessage>, Error = ()>
-/// # + futures_util::Stream<Item = Result<Option<WsMessage>, ()>> + Unpin + Send + 'static {
+/// # where T: futures_util::Sink<Option<WsMessage>, Error = std::io::Error>
+/// # + futures_util::Stream<Item = Result<Option<WsMessage>, std::io::Error>> + Unpin + Send + 'static {
 /// use ws_bridge::transport::{self, Frame};
 /// let conn = transport::into_connection::<Echo, _, _, _>(
 ///     socket,
@@ -56,7 +57,7 @@ where
     E: WsEndpoint,
     T: Sink<M, Error = Err> + Stream<Item = Result<M, Err>> + Unpin + Send + 'static,
     M: Send + 'static,
-    Err: Send + 'static,
+    Err: std::error::Error + Send + Sync + 'static,
 {
     let (sink, stream) = socket.split();
     WsConnection {
@@ -75,13 +76,19 @@ impl<T, M, Err> ErasedSink for TransportSink<T, M>
 where
     T: Sink<M, Error = Err> + Unpin + Send,
     M: Send,
+    Err: std::error::Error + Send + Sync + 'static,
 {
-    fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), ()>> {
-        Box::pin(async move { self.sink.send((self.encode)(msg)).await.map_err(|_| ()) })
+    fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), TransportError>> {
+        Box::pin(async move {
+            self.sink
+                .send((self.encode)(msg))
+                .await
+                .map_err(TransportError::new)
+        })
     }
 
-    fn close(&mut self) -> BoxFuture<'_, Result<(), ()>> {
-        Box::pin(async move { self.sink.close().await.map_err(|_| ()) })
+    fn close(&mut self) -> BoxFuture<'_, Result<(), TransportError>> {
+        Box::pin(async move { self.sink.close().await.map_err(TransportError::new) })
     }
 }
 
@@ -93,13 +100,14 @@ struct TransportStream<T, M> {
 impl<T, M, Err> ErasedStream for TransportStream<T, M>
 where
     T: Stream<Item = Result<M, Err>> + Unpin + Send,
+    Err: std::error::Error + Send + Sync + 'static,
 {
-    fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, ()>>> {
+    fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, TransportError>>> {
         Box::pin(async move {
             loop {
                 match self.stream.next().await {
                     None => return None,
-                    Some(Err(_)) => return Some(Err(())),
+                    Some(Err(e)) => return Some(Err(TransportError::new(e))),
                     Some(Ok(msg)) => match (self.decode)(msg) {
                         Frame::Message(msg) => return Some(Ok(msg)),
                         Frame::Control => continue,

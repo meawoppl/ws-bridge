@@ -1,19 +1,30 @@
+//! Typed WebSocket endpoints shared by HTTP servers, native clients, and browsers.
+//!
+//! Default features are empty. Enable a server or client adapter explicitly;
+//! see the README for the feature matrix and migration notes.
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+
 mod codec;
 mod connection;
 
 pub use codec::{DecodeError, EncodeError, NoMessages, WsCodec, WsMessage};
-pub use connection::{RecvError, SendError, WsConnection, WsReceiver, WsSender};
+pub use connection::{RecvError, SendError, TransportError, WsConnection, WsReceiver, WsSender};
 
 #[cfg(feature = "server")]
+/// Axum server upgrades and typed connections.
 pub mod server;
 
 #[cfg(feature = "yew-client")]
+/// Browser WebSocket connections using gloo.
 pub mod yew_client;
 
 #[cfg(feature = "native-client")]
+/// Native WebSocket connections with rustls TLS support.
 pub mod native_client;
 
 #[cfg(feature = "reconnect")]
+/// Connection factories and automatic exponential backoff.
 pub mod reconnect;
 
 /// Defines a WebSocket endpoint — its path, and the message types

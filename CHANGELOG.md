@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 - 2026-10-10
+
+- Stabilize the feature-gated API and declare Rust 1.94 as the supported minimum.
+- Preserve original native and generic transport failures through error sources.
+- Make send/receive errors non-exhaustive to allow compatible additions.
+- Add native handshake headers, response inspection, and message/frame configuration.
+- Return browser URL discovery errors instead of panicking; add close methods.
+- Flush native/axum close frames and make shared receivers terminal after closure.
+- Encode reconnecting messages once before connecting; clamp extreme backoff settings.
+- Update vulnerable TLS dependencies and add security, MSRV, docs and packaging CI.
+- Document migration, delivery semantics, security responsibilities and releases.
+
 
 - Add optional server adapters for Actix Web, Warp, Rocket, Poem, Salvo, and Hyper
 - Add a generic `transport` adapter for other `Send` WebSocket sink/stream types

@@ -1,3 +1,4 @@
+use crate::TransportError;
 use std::marker::PhantomData;
 
 use futures_util::stream::StreamExt;
@@ -23,7 +24,11 @@ impl std::fmt::Display for ConnectError {
     }
 }
 
-impl std::error::Error for ConnectError {}
+impl std::error::Error for ConnectError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
 
 /// Connects to a WebSocket endpoint using the endpoint's path.
 ///
@@ -58,16 +63,45 @@ pub async fn connect<E: WsEndpoint>(base_url: &str) -> Result<Connection<E>, Con
 ///
 /// Useful for parameterized paths like `/ws/voice/:session_id`.
 pub async fn connect_to_url<E: WsEndpoint>(url: &str) -> Result<Connection<E>, ConnectError> {
-    let (ws_stream, _response) = tokio_tungstenite::connect_async(url)
-        .await
-        .map_err(ConnectError)?;
+    connect_request::<E>(url, None).await.map(|(conn, _)| conn)
+}
 
+/// Types used for custom handshake requests and transport limits.
+/// Re-exported to avoid requiring a second tungstenite dependency.
+pub use tokio_tungstenite::tungstenite::{
+    client::IntoClientRequest, handshake::client::Response, protocol::WebSocketConfig,
+};
+
+/// Connects with custom headers, subprotocols, and optional frame/message limits.
+/// Returns the handshake response so callers can inspect negotiated subprotocols.
+/// Build a request with [`IntoClientRequest`] before adding application headers.
+/// Authentication must be supplied again on each reconnect attempt.
+pub async fn connect_request<E: WsEndpoint>(
+    request: impl IntoClientRequest + Unpin,
+    config: Option<WebSocketConfig>,
+) -> Result<(Connection<E>, Response), ConnectError> {
+    if config
+        .as_ref()
+        .is_some_and(|c| c.max_write_buffer_size <= c.write_buffer_size)
+    {
+        return Err(ConnectError(tungstenite::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "max_write_buffer_size must exceed write_buffer_size",
+        ))));
+    }
+    let (ws_stream, response) =
+        tokio_tungstenite::connect_async_with_config(request, config, false)
+            .await
+            .map_err(ConnectError)?;
     let (sink, stream) = ws_stream.split();
-    Ok(WsConnection {
-        sink: Box::new(TungsteniteSink(sink)),
-        stream: Box::new(TungsteniteStream(stream)),
-        _types: PhantomData,
-    })
+    Ok((
+        WsConnection {
+            sink: Box::new(TungsteniteSink(sink)),
+            stream: Box::new(TungsteniteStream(stream)),
+            _types: PhantomData,
+        },
+        response,
+    ))
 }
 
 // -- tokio-tungstenite transport adapters --
@@ -78,35 +112,30 @@ type WsStream =
 struct TungsteniteSink(futures_util::stream::SplitSink<WsStream, tungstenite::Message>);
 
 impl ErasedSink for TungsteniteSink {
-    fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), ()>> {
+    fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), TransportError>> {
         Box::pin(async move {
             let tung_msg = match msg {
                 WsMessage::Text(t) => tungstenite::Message::Text(t.into()),
                 WsMessage::Binary(b) => tungstenite::Message::Binary(b.into()),
             };
-            self.0.send(tung_msg).await.map_err(|_| ())
+            self.0.send(tung_msg).await.map_err(TransportError::new)
         })
     }
 
-    fn close(&mut self) -> BoxFuture<'_, Result<(), ()>> {
-        Box::pin(async move {
-            self.0
-                .send(tungstenite::Message::Close(None))
-                .await
-                .map_err(|_| ())
-        })
+    fn close(&mut self) -> BoxFuture<'_, Result<(), TransportError>> {
+        Box::pin(async move { self.0.close().await.map_err(TransportError::new) })
     }
 }
 
 struct TungsteniteStream(futures_util::stream::SplitStream<WsStream>);
 
 impl ErasedStream for TungsteniteStream {
-    fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, ()>>> {
+    fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, TransportError>>> {
         Box::pin(async move {
             loop {
                 match self.0.next().await {
                     None => return None,
-                    Some(Err(_)) => return Some(Err(())),
+                    Some(Err(e)) => return Some(Err(TransportError::new(e))),
                     Some(Ok(msg)) => match msg {
                         tungstenite::Message::Text(t) => {
                             return Some(Ok(WsMessage::Text(t.to_string())));

@@ -257,9 +257,7 @@ async fn upgrade_fn_manual_handler() {
             })
             .await
             .unwrap();
-            while let Some(Ok(ClientMsg::Goodbye)) = conn.recv().await {
-                break;
-            }
+            let _ = conn.recv().await;
         })
     }
 
@@ -340,9 +338,8 @@ async fn handler_with_state() {
                     .unwrap();
 
                     while let Some(Ok(msg)) = conn.recv().await {
-                        match msg {
-                            ClientMsg::Goodbye => break,
-                            _ => {}
+                        if matches!(msg, ClientMsg::Goodbye) {
+                            break;
                         }
                     }
                 },
@@ -613,4 +610,61 @@ async fn multiple_clients_concurrent() {
             payload: "from-2".into()
         }
     );
+}
+
+#[tokio::test]
+async fn custom_handshake_headers_response_and_message_limits() {
+    use ws_bridge::native_client::{IntoClientRequest, WebSocketConfig};
+    async fn authenticated(
+        headers: axum::http::HeaderMap,
+        ws: axum::extract::ws::WebSocketUpgrade,
+    ) -> axum::response::Response {
+        assert_eq!(headers.get("authorization").unwrap(), "Bearer test-token");
+        ws_bridge::server::upgrade::<TestEndpoint, _, _>(ws, |mut conn| async move {
+            conn.send(ServerMsg::Hello {
+                greeting: "x".repeat(128),
+            })
+            .await
+            .unwrap();
+            let _ = conn.recv().await;
+        })
+    }
+    let app = axum::Router::new().route(TestEndpoint::PATH, axum::routing::get(authenticated));
+    let (addr, server) = start_server(app).await;
+    let mut request = format!("ws://{addr}{}", TestEndpoint::PATH)
+        .into_client_request()
+        .unwrap();
+    request
+        .headers_mut()
+        .insert("authorization", "Bearer test-token".parse().unwrap());
+    let config = WebSocketConfig::default().max_message_size(Some(16));
+    let (mut conn, response) =
+        ws_bridge::native_client::connect_request::<TestEndpoint>(request, Some(config))
+            .await
+            .unwrap();
+    assert_eq!(response.status().as_u16(), 101);
+    let error = tokio::time::timeout(std::time::Duration::from_secs(2), conn.recv())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap_err();
+    assert!(matches!(error, ws_bridge::RecvError::Transport(_)));
+    assert!(conn.recv().await.is_none());
+    server.abort();
+}
+
+#[tokio::test]
+async fn invalid_write_buffer_limits_return_errors_before_connecting() {
+    use ws_bridge::native_client::WebSocketConfig;
+    let config = WebSocketConfig::default()
+        .write_buffer_size(128)
+        .max_write_buffer_size(128);
+    let result =
+        ws_bridge::native_client::connect_request::<TestEndpoint>("ws://127.0.0.1:1", Some(config))
+            .await;
+    let error = match result {
+        Err(error) => error,
+        Ok(_) => panic!("invalid config accepted"),
+    };
+    assert!(error.to_string().contains("max_write_buffer_size"));
 }

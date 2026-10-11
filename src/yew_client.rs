@@ -11,12 +11,22 @@ use crate::WsEndpoint;
 
 /// Error connecting to a WebSocket endpoint from the browser.
 #[derive(Debug)]
-pub struct ConnectError(gloo_net::websocket::WebSocketError);
+pub struct ConnectError(Box<dyn std::error::Error>);
 
 impl std::fmt::Display for ConnectError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "WebSocket connect error: {:?}", self.0)
     }
+}
+
+impl std::error::Error for ConnectError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.0.as_ref())
+    }
+}
+
+fn location_error(message: &str) -> ConnectError {
+    ConnectError(Box::new(std::io::Error::other(message.to_owned())))
 }
 
 /// Connects to a WebSocket endpoint, deriving `ws://`/`wss://` from the
@@ -42,7 +52,7 @@ impl std::fmt::Display for ConnectError {
 /// # }
 /// ```
 pub fn connect<E: WsEndpoint>() -> Result<Connection<E>, ConnectError> {
-    let url = derive_ws_url(E::PATH);
+    let url = derive_ws_url(E::PATH)?;
     connect_to::<E>(&url)
 }
 
@@ -50,8 +60,11 @@ pub fn connect<E: WsEndpoint>() -> Result<Connection<E>, ConnectError> {
 ///
 /// Use this when you need a custom URL (e.g., a different host).
 pub fn connect_to<E: WsEndpoint>(url: &str) -> Result<Connection<E>, ConnectError> {
-    let ws = WebSocket::open(url)
-        .map_err(|e| ConnectError(gloo_net::websocket::WebSocketError::MessageSendError(e)))?;
+    let ws = WebSocket::open(url).map_err(|e| {
+        ConnectError(Box::new(
+            gloo_net::websocket::WebSocketError::MessageSendError(e),
+        ))
+    })?;
     let (sink, stream) = ws.split();
     Ok(Connection {
         sink,
@@ -73,6 +86,7 @@ pub struct Connection<E: WsEndpoint> {
 }
 
 impl<E: WsEndpoint> Connection<E> {
+    /// Encodes and sends a client message. Cancellation may leave delivery uncertain.
     pub async fn send(&mut self, msg: E::ClientMsg) -> Result<(), SendError> {
         let ws_msg = msg.encode()?;
         let gloo_msg = match ws_msg {
@@ -85,6 +99,12 @@ impl<E: WsEndpoint> Connection<E> {
             .map_err(|_| SendError::Closed)
     }
 
+    /// Initiates the close handshake; continue receiving until the stream ends.
+    pub async fn close(&mut self) -> Result<(), SendError> {
+        self.sink.close().await.map_err(|_| SendError::Closed)
+    }
+
+    /// Receives a server message; malformed payloads produce recoverable decode errors.
     pub async fn recv(&mut self) -> Option<Result<E::ServerMsg, RecvError>> {
         match self.stream.next().await {
             None => None,
@@ -121,6 +141,12 @@ pub struct Sender<E: WsEndpoint> {
 }
 
 impl<E: WsEndpoint> Sender<E> {
+    /// Initiates the close handshake.
+    pub async fn close(&mut self) -> Result<(), SendError> {
+        self.sink.close().await.map_err(|_| SendError::Closed)
+    }
+
+    /// Encodes and sends a client message. Cancellation may leave delivery uncertain.
     pub async fn send(&mut self, msg: E::ClientMsg) -> Result<(), SendError> {
         let ws_msg = msg.encode()?;
         let gloo_msg = match ws_msg {
@@ -141,6 +167,7 @@ pub struct Receiver<E: WsEndpoint> {
 }
 
 impl<E: WsEndpoint> Receiver<E> {
+    /// Receives a server message; malformed payloads produce recoverable decode errors.
     pub async fn recv(&mut self) -> Option<Result<E::ServerMsg, RecvError>> {
         match self.stream.next().await {
             None => None,
@@ -159,12 +186,48 @@ impl<E: WsEndpoint> Receiver<E> {
 /// Derives a WebSocket URL from the current page's protocol and host.
 ///
 /// `http:` → `ws:`, `https:` → `wss:`.
-fn derive_ws_url(path: &str) -> String {
-    let window = web_sys::window().expect("no window object");
+fn derive_ws_url(path: &str) -> Result<String, ConnectError> {
+    let window = web_sys::window().ok_or_else(|| location_error("no browser window"))?;
     let location = window.location();
-    let protocol = location.protocol().expect("no protocol");
-    let host = location.host().expect("no host");
+    let protocol = location
+        .protocol()
+        .map_err(|_| location_error("cannot read page protocol"))?;
+    let host = location
+        .host()
+        .map_err(|_| location_error("cannot read page host"))?;
+    page_ws_url(&protocol, &host, path)
+}
 
-    let ws_protocol = if protocol == "https:" { "wss:" } else { "ws:" };
-    format!("{ws_protocol}//{host}{path}")
+fn page_ws_url(protocol: &str, host: &str, path: &str) -> Result<String, ConnectError> {
+    let ws_protocol = match protocol {
+        "http:" => "ws:",
+        "https:" => "wss:",
+        _ => return Err(location_error("page must use http or https")),
+    };
+    if host.is_empty() || !path.starts_with('/') || path.starts_with("//") {
+        return Err(location_error(
+            "endpoint requires a host and an absolute path",
+        ));
+    }
+    Ok(format!("{ws_protocol}//{host}{path}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn page_urls_are_validated() {
+        assert_eq!(
+            page_ws_url("https:", "localhost:8080", "/ws").unwrap(),
+            "wss://localhost:8080/ws"
+        );
+        for (protocol, host, path) in [
+            ("file:", "", "/ws"),
+            ("http:", "", "/ws"),
+            ("http:", "host", "ws"),
+            ("http:", "host", "//other"),
+        ] {
+            assert!(page_ws_url(protocol, host, path).is_err());
+        }
+    }
 }

@@ -1681,9 +1681,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.2"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1"
+checksum = "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
@@ -1946,9 +1946,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.37"
+version = "0.23.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "758025cb5fccfd3bc2fd74708fd4682be41d99e5dff73c377c0646c6012c73a4"
+checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
 dependencies = [
  "once_cell",
  "rustls-pki-types",
@@ -1968,9 +1968,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.10"
+version = "0.103.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df33b2b81ac578cabaf06b89b0631153a3f416b0a886e8a7a1707fb51abbd1ef"
+checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -2368,7 +2368,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -2789,7 +2789,7 @@ dependencies = [
  "http 1.5.0",
  "httparse",
  "log",
- "rand 0.9.2",
+ "rand 0.9.5",
  "sha1 0.10.6",
  "thiserror 2.0.18",
  "utf-8",
@@ -2806,7 +2806,7 @@ dependencies = [
  "http 1.5.0",
  "httparse",
  "log",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rustls",
  "rustls-pki-types",
  "sha1 0.10.6",
@@ -2825,7 +2825,7 @@ dependencies = [
  "http 1.5.0",
  "httparse",
  "log",
- "rand 0.9.2",
+ "rand 0.9.5",
  "sha1 0.10.6",
  "thiserror 2.0.18",
 ]
@@ -3364,7 +3364,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "ws-bridge"
-version = "0.2.1"
+version = "1.0.0"
 dependencies = [
  "actix-rt",
  "actix-web",
