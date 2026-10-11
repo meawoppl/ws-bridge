@@ -78,17 +78,15 @@ impl<E: WsEndpoint> Connection<E> {
     }
 
     pub async fn recv(&mut self) -> Option<Result<E::ServerMsg, RecvError>> {
-        loop {
-            match self.stream.next().await {
-                None => return None,
-                Some(Err(_)) => return Some(Err(RecvError::Closed)),
-                Some(Ok(msg)) => {
-                    let ws_msg = match msg {
-                        Message::Text(t) => WsMessage::Text(t),
-                        Message::Bytes(b) => WsMessage::Binary(b),
-                    };
-                    return Some(E::ServerMsg::decode(ws_msg).map_err(RecvError::Decode));
-                }
+        match self.stream.next().await {
+            None => None,
+            Some(Err(_)) => Some(Err(RecvError::Closed)),
+            Some(Ok(msg)) => {
+                let ws_msg = match msg {
+                    Message::Text(t) => WsMessage::Text(t),
+                    Message::Bytes(b) => WsMessage::Binary(b),
+                };
+                Some(E::ServerMsg::decode(ws_msg).map_err(RecvError::Decode))
             }
         }
     }
@@ -136,17 +134,15 @@ pub struct Receiver<E: WsEndpoint> {
 
 impl<E: WsEndpoint> Receiver<E> {
     pub async fn recv(&mut self) -> Option<Result<E::ServerMsg, RecvError>> {
-        loop {
-            match self.stream.next().await {
-                None => return None,
-                Some(Err(_)) => return Some(Err(RecvError::Closed)),
-                Some(Ok(msg)) => {
-                    let ws_msg = match msg {
-                        Message::Text(t) => WsMessage::Text(t),
-                        Message::Bytes(b) => WsMessage::Binary(b),
-                    };
-                    return Some(E::ServerMsg::decode(ws_msg).map_err(RecvError::Decode));
-                }
+        match self.stream.next().await {
+            None => None,
+            Some(Err(_)) => Some(Err(RecvError::Closed)),
+            Some(Ok(msg)) => {
+                let ws_msg = match msg {
+                    Message::Text(t) => WsMessage::Text(t),
+                    Message::Bytes(b) => WsMessage::Binary(b),
+                };
+                Some(E::ServerMsg::decode(ws_msg).map_err(RecvError::Decode))
             }
         }
     }
