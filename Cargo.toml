@@ -33,5 +33,5 @@ web-sys = { version = "0.3", features = ["Window", "Location"], optional = true 
 tokio-tungstenite = { version = "0.28", optional = true, features = ["rustls-tls-webpki-roots"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full", "test-util"] }
 axum = { version = "0.8", features = ["ws"] }
