@@ -1,6 +1,6 @@
 //! Typed WebSockets for Actix Web using `actix-ws` (no actors required).
 //!
-//! Connections stay on Actix's local runtime beca//!
+//! Connections stay on Actix's local runtime because sessions are not `Send`.
 //! # Example
 //!
 //! ```no_run
@@ -21,7 +21,7 @@
 //!     })
 //! }
 //! ```
-use crate::{RecvError, SendError, WsCodec, WsEndpoint, WsMessage};
+use crate::{RecvError, SendError, TransportError, WsCodec, WsEndpoint, WsMessage};
 use actix_ws::{AggregatedMessage, AggregatedMessageStream, MessageStream, Session};
 use std::{future::Future, marker::PhantomData};
 
@@ -103,6 +103,10 @@ impl<E: WsEndpoint> Connection<E> {
     pub async fn recv(&mut self) -> Option<Result<E::ClientMsg, RecvError>> {
         self.receiver.recv().await
     }
+    /// Initiates the close handshake.
+    pub async fn close(&mut self) -> Result<(), SendError> {
+        self.sender.close().await
+    }
     /// Splits into independently usable sender and receiver halves.
     pub fn split(self) -> (Sender<E>, Receiver<E>) {
         (self.sender, self.receiver)
@@ -118,7 +122,7 @@ impl<E: WsEndpoint> Sender<E> {
             WsMessage::Text(t) => session.text(t).await,
             WsMessage::Binary(b) => session.binary(b).await,
         }
-        .map_err(|_| SendError::Closed)
+        .map_err(|e| SendError::Transport(TransportError::new(e)))
     }
     /// Sends a close frame and prevents further sends on this half.
     pub async fn close(&mut self) -> Result<(), SendError> {
@@ -127,7 +131,7 @@ impl<E: WsEndpoint> Sender<E> {
             .ok_or(SendError::Closed)?
             .close(None)
             .await
-            .map_err(|_| SendError::Closed)
+            .map_err(|e| SendError::Transport(TransportError::new(e)))
     }
 }
 
@@ -144,9 +148,9 @@ impl<E: WsEndpoint> Receiver<E> {
                     self.closed = true;
                     return None;
                 }
-                Some(Err(_)) => {
+                Some(Err(e)) => {
                     self.closed = true;
-                    return Some(Err(RecvError::Closed));
+                    return Some(Err(RecvError::Transport(TransportError::new(e))));
                 }
                 Some(Ok(msg)) => msg,
             };

@@ -11,7 +11,8 @@ pub struct BackoffConfig {
     pub initial: Duration,
     /// Maximum delay between reconnection attempts.
     pub max: Duration,
-    /// Multiplier applied to the delay after each failed attempt.
+    /// Multiplier applied after each failed attempt. Non-finite values and
+    /// values below 1 are treated as 1; the initial delay is capped at `max`.
     pub multiplier: f64,
 }
 
@@ -27,9 +28,22 @@ impl Default for BackoffConfig {
 
 impl BackoffConfig {
     fn delay_for_attempt(&self, attempt: u32) -> Duration {
-        let delay_secs = self.initial.as_secs_f64() * self.multiplier.powi(attempt as i32);
-        let clamped = delay_secs.min(self.max.as_secs_f64());
-        Duration::from_secs_f64(clamped)
+        // Public configuration must never let NaN, overflow, or a large attempt
+        // counter panic inside the retry loop. Invalid multipliers use 1.0.
+        let multiplier = if self.multiplier.is_finite() && self.multiplier >= 1.0 {
+            self.multiplier
+        } else {
+            1.0
+        };
+        let initial = self.initial.min(self.max);
+        if initial.is_zero() {
+            return Duration::ZERO;
+        }
+        let seconds = initial.as_secs_f64() * multiplier.powf(f64::from(attempt));
+        if seconds >= self.max.as_secs_f64() {
+            return self.max;
+        }
+        Duration::try_from_secs_f64(seconds).unwrap_or(self.max)
     }
 }
 
@@ -75,7 +89,7 @@ impl BackoffConfig {
 /// ```
 pub struct ReconnectingWs<S, R, F, Fut>
 where
-    S: WsCodec + Clone,
+    S: WsCodec,
     R: WsCodec,
     F: FnMut() -> Fut,
     Fut: Future<Output = Option<WsConnection<S, R>>>,
@@ -90,7 +104,7 @@ where
 
 impl<S, R, F, Fut> ReconnectingWs<S, R, F, Fut>
 where
-    S: WsCodec + Clone,
+    S: WsCodec,
     R: WsCodec,
     F: FnMut() -> Fut,
     Fut: Future<Output = Option<WsConnection<S, R>>>,
@@ -113,19 +127,23 @@ where
     /// Sends a message, reconnecting if necessary.
     ///
     /// Encoding errors are returned immediately without dropping the connection.
-    /// Connection failures are retried indefinitely.
+    /// Encoding runs once, before attempting to connect. Connection failures
+    /// are retried indefinitely. Delivery can be duplicated when a send fails
+    /// after the peer received it; use application message IDs for deduplication.
+    /// Wrap operations in `tokio::time::timeout` when bounded retries are needed.
     pub async fn send(&mut self, msg: S) -> Result<(), SendError> {
+        let encoded = msg.encode()?;
         loop {
             if self.conn.is_none() {
                 self.reconnect().await;
             }
             if let Some(ref mut conn) = self.conn {
-                match conn.send(msg.clone()).await {
+                match conn.send_encoded(encoded.clone()).await {
                     Ok(()) => {
                         return Ok(());
                     }
                     Err(e @ SendError::Encode(_)) => return Err(e),
-                    Err(SendError::Closed) => {
+                    Err(SendError::Closed | SendError::Transport(_)) => {
                         self.drop_connection();
                         continue;
                     }
@@ -138,7 +156,7 @@ where
     /// Receives a message, reconnecting if the connection drops.
     ///
     /// Decode errors (`RecvError::Decode`) are returned to the caller.
-    /// Connection closures (`None` or `RecvError::Closed`) trigger
+    /// Connection closures and transport errors trigger
     /// automatic reconnection.
     ///
     /// Returns `None` only if reconnection permanently fails (which
@@ -156,7 +174,7 @@ where
                     Some(Err(RecvError::Decode(e))) => {
                         return Some(Err(RecvError::Decode(e)));
                     }
-                    Some(Err(RecvError::Closed)) | None => {
+                    Some(Err(RecvError::Closed | RecvError::Transport(_))) | None => {
                         // Connection lost, reconnect.
                         self.drop_connection();
                         continue;
@@ -198,10 +216,56 @@ where
     }
 }
 
+/// Convenience constructor for reconnecting to a native-client endpoint.
+///
+/// # Example
+///
+/// ```no_run
+/// # use ws_bridge::WsEndpoint;
+/// # struct SessionSocket;
+/// # impl WsEndpoint for SessionSocket {
+/// #     const PATH: &'static str = "/ws/session";
+/// #     type ServerMsg = String;
+/// #     type ClientMsg = String;
+/// # }
+/// use ws_bridge::reconnect::{self, BackoffConfig};
+///
+/// let mut ws = reconnect::connect_native::<SessionSocket>(
+///     "ws://localhost:3000".into(),
+///     BackoffConfig::default(),
+/// );
+/// ```
+#[cfg(feature = "native-client")]
+#[allow(clippy::type_complexity)]
+pub fn connect_native<E>(
+    base_url: String,
+    config: BackoffConfig,
+) -> ReconnectingWs<
+    E::ClientMsg,
+    E::ServerMsg,
+    impl FnMut() -> std::pin::Pin<
+        Box<dyn Future<Output = Option<WsConnection<E::ClientMsg, E::ServerMsg>>> + Send>,
+    >,
+    std::pin::Pin<
+        Box<dyn Future<Output = Option<WsConnection<E::ClientMsg, E::ServerMsg>>> + Send>,
+    >,
+>
+where
+    E: crate::WsEndpoint,
+{
+    ReconnectingWs::new(config, move || {
+        let url = base_url.clone();
+        Box::pin(async move { crate::native_client::connect::<E>(&url).await.ok() })
+            as std::pin::Pin<
+                Box<dyn Future<Output = Option<WsConnection<E::ClientMsg, E::ServerMsg>>> + Send>,
+            >
+    })
+}
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::connection::{BoxFuture, ErasedSink, ErasedStream};
+    use crate::TransportError;
     use crate::{DecodeError, EncodeError, WsMessage};
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
@@ -210,16 +274,16 @@ mod tests {
 
     struct Sink;
     impl ErasedSink for Sink {
-        fn send(&mut self, _: WsMessage) -> BoxFuture<'_, Result<(), ()>> {
+        fn send(&mut self, _: WsMessage) -> BoxFuture<'_, Result<(), TransportError>> {
             Box::pin(async { Ok(()) })
         }
-        fn close(&mut self) -> BoxFuture<'_, Result<(), ()>> {
+        fn close(&mut self) -> BoxFuture<'_, Result<(), TransportError>> {
             Box::pin(async { Ok(()) })
         }
     }
     struct ClosedStream;
     impl ErasedStream for ClosedStream {
-        fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, ()>>> {
+        fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, TransportError>>> {
             Box::pin(async { None })
         }
     }
@@ -246,6 +310,39 @@ mod tests {
         fn decode(_: WsMessage) -> Result<Self, DecodeError> {
             Ok(Self { invalid: false })
         }
+    }
+
+    #[test]
+    fn backoff_handles_extreme_configuration() {
+        for multiplier in [f64::NAN, f64::INFINITY, -1.0, 0.0, 1.0, 2.0, f64::MAX] {
+            let config = BackoffConfig {
+                initial: Duration::from_secs(2),
+                max: Duration::from_secs(1),
+                multiplier,
+            };
+            for attempt in [0, 1, u32::MAX] {
+                assert!(config.delay_for_attempt(attempt) <= config.max);
+            }
+        }
+        let config = BackoffConfig {
+            initial: Duration::ZERO,
+            max: Duration::MAX,
+            multiplier: 2.0,
+        };
+        assert_eq!(config.delay_for_attempt(u32::MAX), Duration::ZERO);
+    }
+
+    #[tokio::test]
+    async fn invalid_messages_do_not_connect() {
+        let mut ws = ReconnectingWs::new(BackoffConfig::default(), || async {
+            panic!("invalid messages must not call the connection factory");
+            #[allow(unreachable_code)]
+            None::<WsConnection<Message, Message>>
+        });
+        assert!(matches!(
+            ws.send(Message { invalid: true }).await,
+            Err(SendError::Encode(_))
+        ));
     }
 
     #[tokio::test]
@@ -299,50 +396,4 @@ mod tests {
             .is_err());
         assert_eq!(calls.load(Ordering::SeqCst), 3);
     }
-}
-
-/// Convenience constructor for reconnecting to a native-client endpoint.
-///
-/// # Example
-///
-/// ```no_run
-/// # use ws_bridge::WsEndpoint;
-/// # struct SessionSocket;
-/// # impl WsEndpoint for SessionSocket {
-/// #     const PATH: &'static str = "/ws/session";
-/// #     type ServerMsg = String;
-/// #     type ClientMsg = String;
-/// # }
-/// use ws_bridge::reconnect::{self, BackoffConfig};
-///
-/// let mut ws = reconnect::connect_native::<SessionSocket>(
-///     "ws://localhost:3000".into(),
-///     BackoffConfig::default(),
-/// );
-/// ```
-#[cfg(feature = "native-client")]
-#[allow(clippy::type_complexity)]
-pub fn connect_native<E>(
-    base_url: String,
-    config: BackoffConfig,
-) -> ReconnectingWs<
-    E::ClientMsg,
-    E::ServerMsg,
-    impl FnMut() -> std::pin::Pin<
-        Box<dyn Future<Output = Option<WsConnection<E::ClientMsg, E::ServerMsg>>> + Send>,
-    >,
-    std::pin::Pin<
-        Box<dyn Future<Output = Option<WsConnection<E::ClientMsg, E::ServerMsg>>> + Send>,
-    >,
->
-where
-    E: crate::WsEndpoint,
-{
-    ReconnectingWs::new(config, move || {
-        let url = base_url.clone();
-        Box::pin(async move { crate::native_client::connect::<E>(&url).await.ok() })
-            as std::pin::Pin<
-                Box<dyn Future<Output = Option<WsConnection<E::ClientMsg, E::ServerMsg>>> + Send>,
-            >
-    })
 }

@@ -13,11 +13,10 @@ more of these optional features for other servers:
 | Salvo 1 | `salvo-server` | `salvo_server` | `salvo_echo_server` |
 | Hyper 1 / hyper-tungstenite 0.30 | `hyper-server` | `hyper_server` | `hyper_echo_server` |
 
-These adapters are available from the repository; the latest crates.io release
-is still 0.2.1. Until a new release is published, use a Git dependency:
+These adapters are included in the 1.0.0 release:
 
 ```toml
-ws-bridge = { git = "https://github.com/meawoppl/ws-bridge", features = ["actix-server"] }
+ws-bridge = { version = "1.0.0", features = ["actix-server"] }
 ```
 
 ## Try an adapter

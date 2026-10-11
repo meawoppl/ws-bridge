@@ -1,7 +1,9 @@
 [package]
 name = "ws-bridge"
-version = "0.2.1"
+version = "1.0.0"
 edition = "2021"
+rust-version = "1.94"
+readme = "README.md"
 description = "Strongly-typed WebSocket endpoints for Rust — axum, Actix Web, Warp, Rocket, Poem, Salvo, Hyper, browser and native clients"
 license = "MIT"
 repository = "https://github.com/meawoppl/ws-bridge"

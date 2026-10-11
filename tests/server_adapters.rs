@@ -42,7 +42,7 @@ macro_rules! echo {
                         }
                     }
                     Err(ws_bridge::RecvError::Decode(_)) => continue,
-                    Err(ws_bridge::RecvError::Closed) => break,
+                    Err(_) => break,
                 }
             }
             let _ = tx.close().await;
@@ -70,6 +70,7 @@ async fn exercise(addr: SocketAddr) {
             assert_eq!(rx.recv().await.unwrap().unwrap(), packet);
         }
         tx.close().await.unwrap();
+        assert!(rx.recv().await.is_none());
         assert!(rx.recv().await.is_none());
 
         let (mut raw, _) = tokio_tungstenite::connect_async(format!("{base}{}", Echo::PATH))

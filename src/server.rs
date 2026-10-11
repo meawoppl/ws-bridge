@@ -1,3 +1,4 @@
+use crate::TransportError;
 use std::future::Future;
 use std::marker::PhantomData;
 
@@ -189,30 +190,30 @@ fn wrap_axum_socket<E: WsEndpoint>(socket: WebSocket) -> Connection<E> {
 struct AxumSink(futures_util::stream::SplitSink<WebSocket, Message>);
 
 impl ErasedSink for AxumSink {
-    fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), ()>> {
+    fn send(&mut self, msg: WsMessage) -> BoxFuture<'_, Result<(), TransportError>> {
         Box::pin(async move {
             let axum_msg = match msg {
                 WsMessage::Text(t) => Message::Text(t.into()),
                 WsMessage::Binary(b) => Message::Binary(b.into()),
             };
-            self.0.send(axum_msg).await.map_err(|_| ())
+            self.0.send(axum_msg).await.map_err(TransportError::new)
         })
     }
 
-    fn close(&mut self) -> BoxFuture<'_, Result<(), ()>> {
-        Box::pin(async move { self.0.send(Message::Close(None)).await.map_err(|_| ()) })
+    fn close(&mut self) -> BoxFuture<'_, Result<(), TransportError>> {
+        Box::pin(async move { self.0.close().await.map_err(TransportError::new) })
     }
 }
 
 struct AxumStream(futures_util::stream::SplitStream<WebSocket>);
 
 impl ErasedStream for AxumStream {
-    fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, ()>>> {
+    fn next(&mut self) -> BoxFuture<'_, Option<Result<WsMessage, TransportError>>> {
         Box::pin(async move {
             loop {
                 match self.0.next().await {
                     None => return None,
-                    Some(Err(_)) => return Some(Err(())),
+                    Some(Err(e)) => return Some(Err(TransportError::new(e))),
                     Some(Ok(msg)) => match msg {
                         Message::Text(t) => return Some(Ok(WsMessage::Text(t.to_string()))),
                         Message::Binary(b) => return Some(Ok(WsMessage::Binary(b.to_vec()))),

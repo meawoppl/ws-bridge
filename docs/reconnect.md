@@ -6,7 +6,7 @@ The `reconnect` feature provides `ReconnectingWs`, a wrapper that automatically 
 
 ```toml
 [dependencies]
-ws-bridge = { version = "0.2.1", features = ["reconnect", "native-client"] }
+ws-bridge = { version = "1.0.0", features = ["reconnect", "native-client"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -81,11 +81,11 @@ This is useful when you need custom connection setup (e.g., adding auth headers,
 ws.send(ClientMsg::Ping).await?;
 ```
 
-The `S: Clone` bound on the send type is required because the message may need to be resent after a reconnection.
+Messages are encoded once before connecting. Retries reuse that encoded frame; the send type does not require `Clone`. Failed sends may already have reached the peer, so use application IDs and acknowledgements to deduplicate retries.
 
 ### Receiving
 
-`recv()` returns the next message. If the connection drops (`None` or `RecvError::Closed`), it transparently reconnects and continues receiving. Decode errors (`RecvError::Decode`) are passed through to the caller.
+`recv()` returns the next message. If the connection drops (`None`, `RecvError::Closed`, or `RecvError::Transport`), it transparently reconnects and continues receiving. Decode errors (`RecvError::Decode`) are passed through to the caller.
 
 ```rust
 while let Some(result) = ws.recv().await {
