@@ -32,12 +32,22 @@ impl std::error::Error for ConnectError {}
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use ws_bridge::WsEndpoint;
+/// # struct SessionSocket;
+/// # impl WsEndpoint for SessionSocket {
+/// #     const PATH: &'static str = "/ws/session";
+/// #     type ServerMsg = String;
+/// #     type ClientMsg = String;
+/// # }
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut conn = ws_bridge::native_client::connect::<SessionSocket>("ws://localhost:3000").await?;
-/// conn.send(ProxyToServer::Register { ... }).await?;
+/// conn.send("hello".to_owned()).await?;
 /// while let Some(Ok(msg)) = conn.recv().await {
 ///     // msg is SessionSocket::ServerMsg
 /// }
+/// # Ok(())
+/// # }
 /// ```
 pub async fn connect<E: WsEndpoint>(base_url: &str) -> Result<Connection<E>, ConnectError> {
     let url = format!("{}{}", base_url.trim_end_matches('/'), E::PATH);

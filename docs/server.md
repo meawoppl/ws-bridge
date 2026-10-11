@@ -6,7 +6,7 @@ The `server` feature provides typed WebSocket handlers for [axum](https://docs.r
 
 ```toml
 [dependencies]
-ws-bridge = { version = "0.1", features = ["server"] }
+ws-bridge = { version = "0.2.1", features = ["server"] }
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1", features = ["full"] }
 ```

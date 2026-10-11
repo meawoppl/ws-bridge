@@ -24,10 +24,17 @@ pub type Connection<E> = WsConnection<<E as WsEndpoint>::ServerMsg, <E as WsEndp
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use ws_bridge::WsEndpoint;
+/// # struct SessionSocket;
+/// # impl WsEndpoint for SessionSocket {
+/// #     const PATH: &'static str = "/ws/session";
+/// #     type ServerMsg = String;
+/// #     type ClientMsg = String;
+/// # }
 /// use axum::Router;
 ///
-/// let app = Router::new()
+/// let app: Router = Router::new()
 ///     .route(
 ///         SessionSocket::PATH,
 ///         ws_bridge::server::handler::<SessionSocket, _, _>(|mut conn| async move {
@@ -54,13 +61,20 @@ where
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use ws_bridge::WsEndpoint;
+/// # struct SessionSocket;
+/// # impl WsEndpoint for SessionSocket {
+/// #     const PATH: &'static str = "/ws/session";
+/// #     type ServerMsg = String;
+/// #     type ClientMsg = String;
+/// # }
 /// use axum::Router;
 /// use std::sync::Arc;
 ///
 /// struct AppState { /* ... */ }
 ///
-/// let app = Router::new()
+/// let app: Router = Router::new()
 ///     .route(
 ///         SessionSocket::PATH,
 ///         ws_bridge::server::handler_with_state::<SessionSocket, _, _, Arc<AppState>>(
@@ -100,12 +114,19 @@ where
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use ws_bridge::WsEndpoint;
+/// # struct SessionSocket;
+/// # impl WsEndpoint for SessionSocket {
+/// #     const PATH: &'static str = "/ws/session";
+/// #     type ServerMsg = String;
+/// #     type ClientMsg = String;
+/// # }
 /// use axum::extract::ws::WebSocketUpgrade;
 /// use axum::response::Response;
 ///
 /// async fn handle_session(ws: WebSocketUpgrade) -> Response {
-///     ws_bridge::server::upgrade::<SessionSocket>(ws, |mut conn| async move {
+///     ws_bridge::server::upgrade::<SessionSocket, _, _>(ws, |mut conn| async move {
 ///         while let Some(Ok(msg)) = conn.recv().await {
 ///             // msg is SessionSocket::ClientMsg
 ///         }
@@ -131,7 +152,15 @@ where
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```no_run
+/// # use ws_bridge::WsEndpoint;
+/// # struct SessionSocket;
+/// # impl WsEndpoint for SessionSocket {
+/// #     const PATH: &'static str = "/ws/session";
+/// #     type ServerMsg = String;
+/// #     type ClientMsg = String;
+/// # }
+/// use axum::{extract::ws::WebSocketUpgrade, response::Response};
 /// async fn handle(ws: WebSocketUpgrade) -> Response {
 ///     ws.max_message_size(1024 * 1024)
 ///         .on_upgrade(|socket| async move {

@@ -8,7 +8,7 @@ Enable the feature in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ws-bridge = { version = "0.1", features = ["yew-client"] }
+ws-bridge = { version = "0.2.1", features = ["yew-client"] }
 ```
 
 ## Connecting
@@ -197,8 +197,8 @@ The `yew-client` feature only compiles for `wasm32-unknown-unknown`. Add it to y
 ```toml
 # frontend/Cargo.toml
 [dependencies]
-ws-bridge = { version = "0.1", features = ["yew-client"] }
+ws-bridge = { version = "0.2.1", features = ["yew-client"] }
 
 # server/Cargo.toml — don't include yew-client here
-ws-bridge = { version = "0.1", features = ["server"] }
+ws-bridge = { version = "0.2.1", features = ["server"] }
 ```

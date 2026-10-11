@@ -8,6 +8,9 @@ repository = "https://github.com/meawoppl/ws-bridge"
 keywords = ["websocket", "axum", "yew", "typed", "async"]
 categories = ["web-programming::websocket", "network-programming"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = []
 server = ["dep:axum", "dep:futures-util", "dep:tokio"]

@@ -6,7 +6,7 @@ The `native-client` feature provides a typed WebSocket client using [tokio-tungs
 
 ```toml
 [dependencies]
-ws-bridge = { version = "0.1", features = ["native-client"] }
+ws-bridge = { version = "0.2.1", features = ["native-client"] }
 tokio = { version = "1", features = ["full"] }
 ```
 

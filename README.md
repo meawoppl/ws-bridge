@@ -102,13 +102,13 @@ Enable only what you need:
 ```toml
 [dependencies]
 # Server crate
-ws-bridge = { version = "0.1", features = ["server"] }
+ws-bridge = { version = "0.2.1", features = ["server"] }
 
 # Frontend crate (WASM)
-ws-bridge = { version = "0.1", features = ["yew-client"] }
+ws-bridge = { version = "0.2.1", features = ["yew-client"] }
 
 # CLI / daemon crate
-ws-bridge = { version = "0.1", features = ["native-client", "reconnect"] }
+ws-bridge = { version = "0.2.1", features = ["native-client", "reconnect"] }
 ```
 
 ## Key concepts

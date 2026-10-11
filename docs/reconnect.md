@@ -6,7 +6,7 @@ The `reconnect` feature provides `ReconnectingWs`, a wrapper that automatically 
 
 ```toml
 [dependencies]
-ws-bridge = { version = "0.1", features = ["reconnect", "native-client"] }
+ws-bridge = { version = "0.2.1", features = ["reconnect", "native-client"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -75,7 +75,7 @@ This is useful when you need custom connection setup (e.g., adding auth headers,
 
 ### Sending
 
-`send()` attempts to send the message. If the connection is down, it reconnects first, then sends. If the send fails, it drops the connection and retries on the next loop iteration.
+`send()` attempts to send the message. If the connection is down, it reconnects first, then sends. If the transport closes, it drops the connection and retries. Encoding errors are returned immediately and preserve the connection.
 
 ```rust
 ws.send(ClientMsg::Ping).await?;
