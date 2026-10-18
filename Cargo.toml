@@ -37,12 +37,12 @@ tokio = { version = "1", features = ["sync", "macros", "rt", "time"], optional =
 futures-util = { version = "0.3", features = ["sink"], optional = true }
 
 # yew-client
-gloo-net = { version = "0.6", features = ["websocket"], optional = true }
+gloo-net = { version = "0.7", features = ["websocket"], optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 web-sys = { version = "0.3", features = ["Window", "Location"], optional = true }
 
 # native-client
-tokio-tungstenite = { version = "0.28", optional = true, features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.30", optional = true, features = ["rustls-tls-webpki-roots"] }
 
 # Additional server adapters (enabled independently).
 actix-web = { version = "4", default-features = false, optional = true }
