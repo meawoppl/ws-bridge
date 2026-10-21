@@ -42,7 +42,7 @@ wasm-bindgen-futures = { version = "0.4", optional = true }
 web-sys = { version = "0.3", features = ["Window", "Location"], optional = true }
 
 # native-client
-tokio-tungstenite = { version = "0.28", optional = true, features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.28", optional = true, features = ["rustls-tls-native-roots"] }
 
 # Additional server adapters (enabled independently).
 actix-web = { version = "4", default-features = false, optional = true }
